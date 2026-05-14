@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { BookOpen } from "lucide-react";
+import { Eye, EyeOff, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/useAuth";
@@ -21,6 +21,8 @@ const Signup = () => {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errors, setErrors] = useState<FormErrors>({});
 
@@ -59,13 +61,20 @@ const Signup = () => {
     setIsLoading(true);
 
   const { data, error } = await supabase.auth.signUp({
-  email,
-  password,
-});
+    email,
+    password,
+    options: {
+      data: {
+        name,
+      },
+    },
+  });
 
 console.log("SIGNUP DATA:", data);
+console.log("SIGNUP ERROR:", error);
+setIsLoading(false);
 
-if (data.user) {
+/*if (data.user) {
   const { error: insertError } = await supabase.from("profiles").insert([
     {
       id: data.user.id,
@@ -78,9 +87,10 @@ if (data.user) {
   ]);
 
   console.log("INSERT ERROR:", insertError);
-}
+}*/
 
-    if (error) {
+
+  /*  if (error) {
       setIsLoading(false);
       toast({
         title: "Signup failed",
@@ -89,9 +99,9 @@ if (data.user) {
       });
       return;
     }
-
+*/
     // 📦 Step 2: Insert into DB
-    const { error: dbError } = await supabase.from("users").insert([
+    /*const { error: dbError } = await supabase.from("users").insert([
       {
         id: data.user?.id,
         name,
@@ -99,23 +109,25 @@ if (data.user) {
         skills: "",
         learning_goals: "",
       },
-    ]);
+    ]);*/
 
-    setIsLoading(false);
+    
 
-    if (dbError) {
+    if (error) {
       toast({
-        title: "Database error",
-        description: dbError.message,
+        title: "Signup failed",
+        description: error.message,
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Account created!",
-        description: "Welcome 🎉",
-      });
-      navigate("/dashboard");
+      return;
     }
+
+    toast({
+      title: "Account created!",
+      description: "Welcome 🎉",
+    });
+
+    navigate("/dashboard");
   };
 
  if (loading) {
@@ -180,30 +192,48 @@ return (
         {errors.email && <p className="text-red-400 text-sm">{errors.email}</p>}
 
         {/* Password */}
-        <Input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="bg-white/5 border border-white/10 text-emerald-100 placeholder:text-emerald-400/50 focus:border-green-400"
-        />
-        {errors.password && (
-          <p className="text-red-400 text-sm">{errors.password}</p>
-        )}
+        <div className="relative">
+  <Input
+    type={showPassword ? "text" : "password"}
+    placeholder="Password"
+    value={password}
+    onChange={(e) => setPassword(e.target.value)}
+    className="bg-white/5 border border-white/10 text-emerald-100 placeholder:text-emerald-400/50 focus:border-green-400"
+  />
+
+  <button
+    type="button"
+    className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-300"
+    onClick={() => setShowPassword(!showPassword)}
+  >
+    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+  </button>
+</div>
 
         {/* Confirm Password */}
-        <Input
-          type="password"
-          placeholder="Confirm Password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          className="bg-white/5 border border-white/10 text-emerald-100 placeholder:text-emerald-400/50 focus:border-green-400"
-        />
-        {errors.confirmPassword && (
-          <p className="text-red-400 text-sm">
-            {errors.confirmPassword}
-          </p>
-        )}
+        <div className="relative">
+  <Input
+    type={showConfirmPassword ? "text" : "password"}
+    placeholder="Confirm Password"
+    value={confirmPassword}
+    onChange={(e) => setConfirmPassword(e.target.value)}
+    className="bg-white/5 border border-white/10 text-emerald-100 placeholder:text-emerald-400/50 focus:border-green-400"
+  />
+
+  <button
+    type="button"
+    className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-300"
+    onClick={() =>
+      setShowConfirmPassword(!showConfirmPassword)
+    }
+  >
+    {showConfirmPassword ? (
+      <EyeOff size={16} />
+    ) : (
+      <Eye size={16} />
+    )}
+  </button>
+</div>
 
         {/* Button */}
         <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
