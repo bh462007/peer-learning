@@ -42,34 +42,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session?.user) {
 
   const { data: existingProfile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("id", session.user.id)
-    .single();
+  .from("profiles")
+  .select("*")
+  .eq("email", session.user.email)
+  .maybeSingle();
 
   if (!existingProfile) {
 
     await supabase.from("profiles").insert({
-      id: session.user.id,
-      name:
-        session.user.user_metadata?.name ||
-        session.user.email?.split("@")[0] ||
-        "Learner",
+  name:
+    session.user.user_metadata?.name ||
+    session.user.email?.split("@")[0] ||
+    "Learner",
 
-      email: session.user.email,
+email: session.user.email || "",
 
-      points: 0,
-      sessions_completed: 0,
-      rating: 0,
+  skills: [],
 
-      badges: [],
-      skills: [],
-      interests: [],
-      teach_subjects: [],
-      learn_subjects: [],
+  bio: "",
 
-      bio: "",
-    });
+  avatar_url: `https://api.dicebear.com/9.x/initials/svg?seed=${session.user.email}`,
+});
   }
 }
         setLoading(false);
