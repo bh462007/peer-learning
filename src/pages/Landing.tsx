@@ -202,7 +202,7 @@ export default function Landing() {
       </nav>
 
       {/* Hero */}
-      <section className="container relative grid items-center gap-16 px-6 pb-24 pt-40 lg:grid-cols-2">
+      <section className="container relative grid items-center gap-16 px-6 pb-24 pt-24 lg:grid-cols-2">
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
@@ -313,7 +313,7 @@ export default function Landing() {
       </section>
 
       {/* Stats */}
-      <section className="container grid grid-cols-2 gap-6 px-6 py-10 text-center md:grid-cols-4">
+      <section className="container mx-auto mt-20 grid grid-cols-2 gap-6 px-6 py-10 text-center md:grid-cols-4">
         {stats.map((s, i) => (
           <motion.div
             key={i}
@@ -324,9 +324,13 @@ export default function Landing() {
             whileHover={{ y: -8 }}
             className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-2xl transition-all duration-300 hover:border-cyan-400/30 hover:shadow-[0_0_50px_rgba(34,211,238,0.2)]"
           >
-            <h3 className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-4xl font-black text-transparent">
-              {s.value}
-            </h3>
+            <h3 className="text-4xl font-black">
+  <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+    {s.value.replace('+', '')}
+  </span>
+  <span className="text-cyan-400">+</span>
+</h3>
+
 
             <p className="mt-3 text-slate-300/70">{s.label}</p>
           </motion.div>
@@ -339,7 +343,7 @@ export default function Landing() {
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-center text-5xl font-black tracking-tight"
+          className="text-center text-3xl sm:text-4xl md:text-5xl font-black tracking-tight"
         >
           How
           <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
