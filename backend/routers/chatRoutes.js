@@ -2,6 +2,7 @@ import express from "express";
 import OpenAI from "openai";
 import dotenv from "dotenv";
 import { requireAuth } from "../middlewares/requireAuth.js";
+import { rateLimiter } from "../middlewares/rateLimiter.js";
 dotenv.config();
 const router = express.Router();
 
@@ -37,33 +38,7 @@ const ALLOWED_MODELS = new Set([
 // Server-side cap on tokens per request, regardless of what the caller sends.
 const MAX_TOKENS_CAP = 512;
 
-// Simple in-memory rate limiter: max 20 requests per authenticated user per minute.
-const requestCounts = new Map();
-
-const rateLimiter = (req, res, next) => {
-  const userId = req.user.id;
-  const now = Date.now();
-  const windowMs = 60 * 1000;
-  const maxRequests = 20;
-
-  const entry = requestCounts.get(userId);
-
-  if (!entry || now - entry.windowStart >= windowMs) {
-    requestCounts.set(userId, { count: 1, windowStart: now });
-    return next();
-  }
-
-  if (entry.count >= maxRequests) {
-    return res.status(429).json({
-      error: "Too many requests. Please wait before sending more messages.",
-    });
-  }
-
-  entry.count += 1;
-  next();
-};
-// requireAuth, rateLimiter,
-router.post("/chat",  async (req, res) => {
+router.post("/chat", requireAuth, rateLimiter, async (req, res) => {
   try {
     const {
       messages,
