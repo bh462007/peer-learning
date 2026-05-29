@@ -85,6 +85,35 @@ const Sessions = () => {
     fetchSessions();
   }, []);
 
+  // USER ACTIVITY TRACKER
+  useEffect(() => {
+    let idleTimer: any;
+
+    const handleActivity = () => {
+      setUserStatus("Active");
+
+      clearTimeout(idleTimer);
+
+      idleTimer = setTimeout(() => {
+        setUserStatus("Idle");
+      }, 15000);
+    };
+
+    window.addEventListener("mousemove", handleActivity);
+    window.addEventListener("keydown", handleActivity);
+    window.addEventListener("click", handleActivity);
+
+    handleActivity();
+
+    return () => {
+      clearTimeout(idleTimer);
+
+      window.removeEventListener("mousemove", handleActivity);
+      window.removeEventListener("keydown", handleActivity);
+      window.removeEventListener("click", handleActivity);
+    };
+  }, []);
+
   // FILTER SESSIONS
   useEffect(() => {
     let filtered = sessions;
@@ -611,46 +640,6 @@ const Sessions = () => {
 
               <div ref={messagesEndRef} />
             </div>
-
-          // USER ACTIVITY TRACKER
-                useEffect(() => {
-                  let idleTimer: any;
-
-                  const handleActivity = () => {
-                    setUserStatus("Active");
-
-                    clearTimeout(idleTimer);
-
-                    idleTimer = setTimeout(() => {
-                      setUserStatus("Idle");
-                    }, 15000);
-                  };
-
-                  window.addEventListener("mousemove", handleActivity);
-                  window.addEventListener("keydown", handleActivity);
-                  window.addEventListener("click", handleActivity);
-
-                  handleActivity();
-
-                  return () => {
-                    clearTimeout(idleTimer);
-
-                    window.removeEventListener(
-                      "mousemove",
-                      handleActivity
-                    );
-
-                    window.removeEventListener(
-                      "keydown",
-                      handleActivity
-                    );
-
-                    window.removeEventListener(
-                      "click",
-                      handleActivity
-                    );
-                  };
-                }, []);
 
            {/* TYPING INDICATOR */}
             {isTyping && (
