@@ -9,7 +9,6 @@ const router = express.Router();
 // OpenRouter is OpenAI-compatible, so the OpenAI SDK works by pointing at the
 // OpenRouter base URL. The API key is read from the server environment and is
 // never sent to the client.
-console.log(process.env.OPENROUTER_API_KEY);
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,   // must not be undefined
   baseURL: "https://openrouter.ai/api/v1",
@@ -18,15 +17,6 @@ const openrouter = new OpenAI({
     "X-Title": "Peer Learning AI",
   },
 });
-
-// const openrouter = new OpenAI({
-//   apiKey: process.env.OPENROUTER_API_KEY,
-//   baseURL: "https://openrouter.ai/api/v1",
-//   defaultHeaders: {
-//     "HTTP-Referer": process.env.SITE_URL || "http://localhost:8080",
-//     "X-Title": "Peer Learning AI",
-//   },
-// });
 
 // Allowed models. Requests specifying any other model are rejected to
 // prevent cost escalation via expensive third-party models.
@@ -38,11 +28,17 @@ const ALLOWED_MODELS = new Set([
 // Server-side cap on tokens per request, regardless of what the caller sends.
 const MAX_TOKENS_CAP = 512;
 
+// Fixed system prompt prepended to every conversation server-side.
+// Callers cannot override this via the request body, which prevents
+// prompt injection attacks that would let them alter the assistant persona
+// or bypass content guidelines.
+const SYSTEM_PROMPT =
+  "You are a helpful peer-learning assistant. Answer questions about coding, study techniques, and academic topics in a clear and supportive way.";
+
 router.post("/chat", requireAuth, rateLimiter, async (req, res) => {
   try {
     const {
       messages,
-      systemPrompt,
       model = "openai/gpt-3.5-turbo",
       max_tokens,
       temperature = 0.7,
@@ -78,9 +74,7 @@ router.post("/chat", requireAuth, rateLimiter, async (req, res) => {
       MAX_TOKENS_CAP
     );
 
-    const chatMessages = systemPrompt
-      ? [{ role: "system", content: String(systemPrompt) }, ...messages]
-      : messages;
+    const chatMessages = [{ role: "system", content: SYSTEM_PROMPT }, ...messages];
 
     const response = await openrouter.chat.completions.create({
       model,
@@ -93,8 +87,6 @@ router.post("/chat", requireAuth, rateLimiter, async (req, res) => {
   } catch (error) {
     console.error("Chat route error:", error);
     res.status(500).json({ error: error.message || "AI request failed" });
-
-    // res.status(500).json({ error: "Failed to get a response from the AI service." });
   }
 });
 
