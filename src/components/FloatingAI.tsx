@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Bot, Send, X, User } from "lucide-react";
-
+import { API_BASE_URL } from "@/config/api";
 const FloatingAI = () => {
   const [open, setOpen] =
     useState(false);
@@ -42,7 +42,7 @@ const FloatingAI = () => {
 
     try {
       // Route the request through the backend so the API key stays server-side.
-      const response = await fetch("/api/chat", {
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

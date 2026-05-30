@@ -2,6 +2,7 @@ import { useRole } from "@/contexts/RoleContext";
 import { useAuth } from "@/contexts/useAuth";
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "@/config/api";
 
 import RecommendedPartners from "@/components/recommendations/RecommendedPartners";
 const LearnerDashboard = () => {
@@ -18,7 +19,7 @@ const LearnerDashboard = () => {
         const token = localStorage.getItem("token");
 
         const response = await axios.get(
-          "http://localhost:5000/api/match/recommendations",
+          `${API_BASE_URL}/api/match/recommendations`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
