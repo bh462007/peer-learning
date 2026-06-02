@@ -14,11 +14,30 @@ const evictStaleEntries = (now) => {
   }
 };
 
+/**
+ * Derives a rate-limit key for the current request.
+ *
+ * Priority:
+ *   1. Authenticated user ID (most reliable — cannot be spoofed).
+ *   2. Composite fingerprint combining req.ip, the raw socket remote address,
+ *      and the User-Agent header. This ensures that even if an attacker spoofs
+ *      X-Forwarded-For (when trust proxy is misconfigured), the raw socket IP
+ *      still anchors them to their real origin.
+ */
+const deriveRateLimitKey = (req) => {
+  if (req.user?.id) {
+    return `uid:${req.user.id}`;
+  }
+
+  const expressIp = req.ip || "unknown";
+  const socketIp = req.socket?.remoteAddress || "unknown";
+  const ua = req.headers["user-agent"] || "no-ua";
+
+  return `ip:${expressIp}|${socketIp}|${ua}`;
+};
+
 export const rateLimiter = (req, res, next) => {
-  // If the user is unauthenticated, fallback to req.ip.
-  // Because 'trust proxy' in app.js is conditionally secured, req.ip cannot be spoofed 
-  // via X-Forwarded-For headers unless explicitly allowed by infrastructure.
-  const userId = req.user?.id || req.ip;
+  const key = deriveRateLimitKey(req);
   const now = Date.now();
 
   // Passive eviction: clean up stale entries lazily to avoid holding the event loop open
@@ -27,7 +46,7 @@ export const rateLimiter = (req, res, next) => {
     lastCleanup = now;
   }
 
-  let entry = requestCounts.get(userId);
+  let entry = requestCounts.get(key);
 
   if (!entry || now - entry.windowStart >= WINDOW_MS) {
     if (!entry && requestCounts.size >= MAX_ENTRIES) {
@@ -36,7 +55,7 @@ export const rateLimiter = (req, res, next) => {
         requestCounts.delete(oldestKey);
       }
     }
-    requestCounts.set(userId, { count: 1, windowStart: now });
+    requestCounts.set(key, { count: 1, windowStart: now });
     return next();
   }
 

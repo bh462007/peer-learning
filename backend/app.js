@@ -10,10 +10,16 @@ import { errorHandler } from "./middlewares/errorHandler.js";
 
 const app = express();
 
-// SECURITY: Only trust proxy if explicitly configured (e.g., when behind Nginx/Cloudflare)
-// This prevents attackers from spoofing their IP via X-Forwarded-For headers
-if (process.env.TRUST_PROXY === "true") {
+// SECURITY: Only trust proxy headers when explicitly configured.
+// Set TRUST_PROXY=true for simple single-hop proxies (e.g., Heroku, Render).
+// Set TRUSTED_PROXIES="10.0.0.0/8,172.16.0.0/12" for explicit subnet whitelisting (recommended).
+// When neither is set, req.ip always returns the raw socket address, preventing X-Forwarded-For spoofing.
+if (process.env.TRUSTED_PROXIES) {
+  app.set("trust proxy", process.env.TRUSTED_PROXIES.split(",").map(s => s.trim()));
+  console.log(`[security] trust proxy enabled for subnets: ${process.env.TRUSTED_PROXIES}`);
+} else if (process.env.TRUST_PROXY === "true") {
   app.set("trust proxy", 1);
+  console.warn("[security] trust proxy enabled with hop-count 1. Consider setting TRUSTED_PROXIES for explicit subnet whitelisting.");
 }
 
 app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
