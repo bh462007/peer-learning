@@ -1,20 +1,14 @@
 import { ZodError } from "zod";
-import { HttpError } from "../utils/httpError.js";
 
 export const errorHandler = (err, req, res, next) => {
+  // Gracefully handle Zod validation errors
   if (err instanceof ZodError || err.name === "ZodError") {
+    // Downgrade to console.warn to prevent log pollution with massive stack traces
     console.warn("Validation Error:", err.errors || err.message);
-    return res.status(400).json({
-      statusCode: 400,
-      message: "Validation failed",
-      details: err.errors,
+    return res.status(400).json({ 
+      error: "Validation failed", 
+      details: err.errors 
     });
-  }
-
-  if (err instanceof HttpError) {
-    const body = { statusCode: err.statusCode, message: err.message };
-    if (err.details) body.details = err.details;
-    return res.status(err.statusCode).json(body);
   }
 
   console.error("Unhandled error:", err);
@@ -26,6 +20,9 @@ export const errorHandler = (err, req, res, next) => {
   const status = err.status || err.statusCode || 500;
   const message = err.message || "Internal server error";
 
-  res.status(status).json({ statusCode: status, message });
+  const payload = { error: message };
+  if (err.details) {
+    payload.details = err.details;
+  }
+  res.status(status).json(payload);
 };
-

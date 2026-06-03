@@ -4,8 +4,8 @@ import cors from "cors";
 import chatRoutes from "./routers/chatRoutes.js";
 import aiRoutes from "./routers/aiRoutes.js";
 import matchRoutes from "./routers/matchRoutes.js";
-import { validate } from "./middlewares/validate.js";
-import { authSchemas } from "./validation/schemas.js";
+import cronRoutes from "./routers/cronRoutes.js";
+import notificationRoutes from "./routers/notificationRoutes.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 
 const app = express();
@@ -30,13 +30,11 @@ app.get("/health", (_req, res) => {
 	res.status(200).json({ ok: true });
 });
 
-app.post("/api/forgot-password", validate(authSchemas.forgotPassword), (req, res) => {
-  res.json({ ok: true });
-});
-
 app.use("/api/ai", aiRoutes);
 app.use("/api", chatRoutes);
 app.use("/api/match", matchRoutes);
+app.use("/api/cron", cronRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // 404 handler for unmatched routes
 app.use((_req, res) => {
