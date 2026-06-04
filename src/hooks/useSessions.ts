@@ -69,7 +69,7 @@ export function useSessions(user: any) {
     if (!selectedSession) return;
 
     const fetchMessages = async () => {
-      const { data } = await supabase
+      const { data } = await (supabase as any)
         .from("messages")
         .select("*")
         .eq("session_id", selectedSession.id)
@@ -180,7 +180,7 @@ export function useSessions(user: any) {
   const handleJoinSession = useCallback(async (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
     try {
-      const { data: existingParticipant } = await supabase
+      const { data: existingParticipant } = await (supabase as any)
         .from("session_participants")
         .select("*")
         .eq("session_id", sessionId)
@@ -223,7 +223,7 @@ export function useSessions(user: any) {
       });
     }
 
-    await supabase
+    await (supabase as any)
       .from("messages")
       .insert({
         session_id: selectedSession.id,
@@ -259,6 +259,7 @@ export function useSessions(user: any) {
           "Content-Type": "application/json",
           ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
+        credentials: "include",
         body: JSON.stringify({ messages }),
       });
 
@@ -269,7 +270,7 @@ export function useSessions(user: any) {
       const parsedData = await res.json();
       setSessionSummary(parsedData);
 
-      await supabase
+      await (supabase as any)
         .from("session_summaries")
         .insert({
           session_id: selectedSession.id,
