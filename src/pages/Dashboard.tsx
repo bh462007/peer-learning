@@ -65,6 +65,8 @@ const Dashboard = () => {
   const [recommendedPeers, setRecommendedPeers] = useState<any[]>([]);
   const [upcomingSessions, setUpcomingSessions] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [activityFeed, setActivityFeed] = useState<{ label: string; timestamp: string }[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
 
   const displayName =
     profile?.name?.trim() ||
@@ -96,6 +98,57 @@ const Dashboard = () => {
 
 
     fetchProfile();
+  }, [user]);
+
+  // Activity Feed — derive from sessions joined, resources uploaded, and study rooms joined
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchActivity = async () => {
+      setActivityLoading(true);
+      try {
+        const [sessionsRes, resourcesRes, roomsRes] = await Promise.all([
+          supabase
+            .from("sessions")
+            .select("title, created_at")
+            .eq("student_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(3),
+          supabase
+            .from("resources")
+            .select("title, created_at")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(3),
+          supabase
+            .from("study_room_participants")
+            .select("joined_at, study_rooms(topic)")
+            .eq("profile_id", user.id)
+            .order("joined_at", { ascending: false })
+            .limit(3),
+        ]);
+
+        const entries: { label: string; timestamp: string }[] = [];
+
+        (sessionsRes.data ?? []).forEach((s: any) => {
+          entries.push({ label: `Joined session: ${s.title ?? "Untitled"}`, timestamp: s.created_at });
+        });
+        (resourcesRes.data ?? []).forEach((r: any) => {
+          entries.push({ label: `Uploaded resource: ${r.title}`, timestamp: r.created_at });
+        });
+        (roomsRes.data ?? []).forEach((p: any) => {
+          const topic = p.study_rooms?.topic ?? "Study Room";
+          entries.push({ label: `Joined study room: ${topic}`, timestamp: p.joined_at });
+        });
+
+        entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setActivityFeed(entries.slice(0, 5));
+      } finally {
+        setActivityLoading(false);
+      }
+    };
+
+    fetchActivity();
   }, [user]);
 
   // Recommended Peers
@@ -452,13 +505,13 @@ const Dashboard = () => {
               </h2>
 
               <div className="space-y-4">
-
-                {[
-                  "Joined AI Session",
-                  "Completed React Quiz",
-                  "New Peer Request",
-                  "Earned 50 XP",
-                ].map((activity, i) => (
+                {activityLoading && (
+                  <p className="text-sm text-slate-400">Loading activity…</p>
+                )}
+                {!activityLoading && activityFeed.length === 0 && (
+                  <p className="text-sm text-slate-400">No recent activity yet.</p>
+                )}
+                {!activityLoading && activityFeed.map((item, i) => (
                   <motion.div
                     key={i}
                     whileHover={{ x: 4 }}
@@ -466,17 +519,13 @@ const Dashboard = () => {
                   >
                     <div>
                       <p className="text-sm text-white">
-                        {activity}
+                        {item.label}
                       </p>
-
                       <span className="text-xs text-slate-400">
-                        2 mins ago
+                        {new Date(item.timestamp).toLocaleString()}
                       </span>
                     </div>
-
-                    <div className="text-cyan-400">
-                      ✔
-                    </div>
+                    <div className="text-cyan-400">✔</div>
                   </motion.div>
                 ))}
               </div>
