@@ -1,9 +1,49 @@
 import nodemailer from "nodemailer";
 import { env } from "../config.js";
 
-// Basic email format check — catches the most common malformed inputs
-// before a network call is made.
-const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value));
+// Stricter email validation following RFC 5321/5322 simplified rules
+// Prevents accepting invalid formats like 'a@b' (no TLD) or single-character components
+const isValidEmail = (value) => {
+  const email = String(value).trim().toLowerCase();
+
+  // RFC 5321/5322 simplified pattern with stricter requirements:
+  // - Local part: alphanumeric, dots, hyphens, underscores, plus signs
+  // - Domain: alphanumeric and hyphens, multiple levels
+  // - TLD: at least 2 characters (required for valid domain)
+  const emailRegex = /^[a-z0-9._%-+]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
+
+  if (!emailRegex.test(email)) {
+    return false;
+  }
+
+  // Additional validation rules
+  // Prevent addresses that exceed RFC 5321 limits (254 chars total, 64 chars local)
+  if (email.length > 254) {
+    return false;
+  }
+
+  const [localPart, domain] = email.split('@');
+  if (localPart.length > 64) {
+    return false;
+  }
+
+  // Prevent consecutive dots (invalid in both local and domain parts)
+  if (email.includes('..')) {
+    return false;
+  }
+
+  // Prevent leading or trailing dots in local part
+  if (localPart.startsWith('.') || localPart.endsWith('.')) {
+    return false;
+  }
+
+  // Prevent leading or trailing hyphens in domain (RFC 952)
+  if (domain.startsWith('-') || domain.endsWith('-')) {
+    return false;
+  }
+
+  return true;
+};
 
 // Ensure the reset URL uses a safe scheme before embedding it in an email.
 // A javascript: or data: URL would execute in some email clients.
