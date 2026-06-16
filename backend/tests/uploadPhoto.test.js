@@ -1,3 +1,4 @@
+import fs from "fs";
 import crypto from "crypto";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -6,6 +7,10 @@ import request from "supertest";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import cookieParser from "cookie-parser";
 import { errorHandler } from "../middlewares/errorHandler.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const profilesUploadDir = path.resolve(__dirname, "../uploads/profiles");
 
 // ── Supabase stub (requireAuth fast-path won't reach it, but the import needs it) ──
 vi.mock("../utils/supabase.js", () => ({
@@ -68,6 +73,7 @@ afterAll(() => {
 });
 
 afterEach(() => {
+  fs.rmSync(profilesUploadDir, { recursive: true, force: true });
   vi.restoreAllMocks();
 });
 
@@ -154,6 +160,21 @@ describe("POST /api/users/upload-photo", () => {
       .attach("profilePhoto", fakeScript, {
         filename: "exploit.sh",
         contentType: "application/x-sh",
+      });
+
+    expect(res.status).toBe(415);
+  });
+
+  it("returns 415 when non-image bytes are uploaded with a spoofed image/png content type", async () => {
+    const token = makeToken();
+    // Real script bytes with a .png filename and image/png MIME — magic-byte check must catch this
+    const fakeBytes = Buffer.from("#!/bin/bash\necho pwned\n");
+    const res = await request(app)
+      .post("/api/users/upload-photo")
+      .set("Authorization", `Bearer ${token}`)
+      .attach("profilePhoto", fakeBytes, {
+        filename: "exploit.png",       // .png extension
+        contentType: "image/png",      // spoofed MIME header
       });
 
     expect(res.status).toBe(415);
