@@ -13,14 +13,14 @@ const BREAK_MAX = 60;
 
 interface GroupPomodoroProps {
   roomId: string;
-  creatorId: string;
+  creatorId: string | null;
 }
 
 export default function GroupPomodoro({ roomId, creatorId }: GroupPomodoroProps) {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const isCreator = user?.id === creatorId;
+  const isCreator = creatorId !== null && user?.id === creatorId;
 
   const [timerState, setTimerState] = useState<'idle' | 'work' | 'break'>('idle');
   const [endTime, setEndTime] = useState<Date | null>(null);
@@ -89,7 +89,7 @@ export default function GroupPomodoro({ roomId, creatorId }: GroupPomodoroProps)
         ? new Date(Date.now() + clampedDuration * 60 * 1000).toISOString()
         : null;
 
-    await supabase
+    const { error } = await supabase
       .from('study_rooms' as any)
       .update({
         timer_state: newState,
@@ -98,7 +98,15 @@ export default function GroupPomodoro({ roomId, creatorId }: GroupPomodoroProps)
         timer_break_duration: brk,
       })
       .eq('id', roomId);
-  }, [clampDurations, roomId]);
+
+    if (error) {
+      toast({
+        title: 'Timer update failed',
+        description: 'Could not sync the timer. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  }, [clampDurations, roomId, toast]);
 
   const handleTimerComplete = useCallback(async () => {
     if (!isCreator) return;
