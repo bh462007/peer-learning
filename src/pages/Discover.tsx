@@ -61,7 +61,7 @@ const DiscoverPeerCard = memo(({ user, isOnline, onConnect, isConnected }: any) 
         <div className="relative">
           <img
             src={user.avatar_url || "https://i.pravatar.cc/150"}
-            alt={user.name}
+            alt={`${user.name || "User"} profile picture`}
             loading="lazy"
             decoding="async"
             className="w-16 h-16 rounded-full object-cover border-2 border-cyan-400"
@@ -283,7 +283,7 @@ const Discover = () => {
                 currentUser?.avatar_url ||
                 "https://i.pravatar.cc/150"
               }
-              alt="avatar"
+              alt={`${currentUser?.name || "Current user"} profile picture`}
               loading="lazy"
               decoding="async"
               className="w-12 h-12 rounded-full border-2 border-cyan-400 object-cover"
