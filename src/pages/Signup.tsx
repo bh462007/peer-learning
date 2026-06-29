@@ -282,13 +282,13 @@ const Signup = () => {
 
             {password && (
               <div className="mt-2">
-              <div className="h-2 w-full bg-state-700 rounded">
+              <div className="h-2 w-full bg-slate-700 rounded">
                 <div
                   className ={`h-2 rounded transition-all duration-300 ${passwordStrength.color}`}
                   style={{ width: `${(passwordStrength.label === "Weak" ? 33 : passwordStrength.label === "Medium" ? 66 : 100)}%` }}
                 />
               </div>
-              <p className="text-sm text-state-300 mt-1">Password Strength: {passwordStrength.label}</p>
+              <p className="text-sm text-slate-300 mt-1">Password Strength: {passwordStrength.label}</p>
               <div className="mt-2 text-sm space-y-1">
                 <p className={password.length >= 8 ? "text-green-400" : "text-red-400"}>
                   {password.length >= 8 ? "✓" : "✗"} At least 8 characters
