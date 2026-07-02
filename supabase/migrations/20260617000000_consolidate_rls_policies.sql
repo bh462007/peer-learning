@@ -290,21 +290,27 @@ CREATE POLICY "Admins can update all mentor apps"
   ON public.mentors FOR UPDATE USING (public.has_role(auth.uid(), 'admin'));
 
 -- mentorship_paths & mentorship_milestones
-CREATE POLICY "Users can view own mentorship paths"
+CREATE POLICY "Users and admins can view mentorship paths"
   ON public.mentorship_paths FOR SELECT USING (
-    auth.uid() = mentor_id OR auth.uid() = mentee_id
+    auth.uid() = mentor_id
+    OR auth.uid() = mentee_id
+    OR public.has_role(auth.uid(), 'admin')
   );
 
 CREATE POLICY "Mentors can manage their paths" 
   ON public.mentorship_paths FOR ALL USING (mentor_id = auth.uid());
 
-CREATE POLICY "Users can view own mentorship milestones"
+CREATE POLICY "Users and admins can view mentorship milestones"
   ON public.mentorship_milestones FOR SELECT USING (
     EXISTS (
       SELECT 1
       FROM public.mentorship_paths mp
       WHERE mp.id = mentorship_milestones.path_id
-        AND (mp.mentor_id = auth.uid() OR mp.mentee_id = auth.uid())
+        AND (
+          auth.uid() = mp.mentor_id
+          OR auth.uid() = mp.mentee_id
+          OR public.has_role(auth.uid(), 'admin')
+        )
     )
   );
 
