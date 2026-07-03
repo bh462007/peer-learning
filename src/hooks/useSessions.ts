@@ -220,6 +220,10 @@ export function useSessions(user: any) {
       } else {
         toast({ title: "Success! 🎉", description: "You have joined the session." });
 
+        // Only award XP here, after join_session has actually succeeded and
+        // confirmed the user as a participant. This is the single source of
+        // truth for "session_join" XP — handleJoinVideo must NOT award it,
+        // since opening the video does not by itself confirm participation.
         if (!existingParticipant) {
           awardedSessionsRef.current.add(sessionId);
           awardXP({ activity: "session_join" });
@@ -314,13 +318,14 @@ export function useSessions(user: any) {
     }
   }, [selectedSession, messages]);
 
+  // NOTE: This no longer awards "session_join" XP. Opening the video call is
+  // not proof of confirmed participation — only a successful `join_session`
+  // RPC call (handled in handleJoinSession) confirms that, so that's the
+  // only place XP is granted. This closes the XP-farming hole where a user
+  // could click "Join Video" without ever clicking "Join Session".
   const handleJoinVideo = useCallback(() => {
     setIsVideoActive(true);
-    if (selectedSession && !awardedSessionsRef.current.has(selectedSession.id)) {
-      awardedSessionsRef.current.add(selectedSession.id);
-      awardXP({ activity: 'session_join' });
-    }
-  }, [awardXP, selectedSession]);
+  }, []);
 
   return {
     sessions,
