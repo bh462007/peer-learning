@@ -446,6 +446,30 @@ export type Database = {
         }
         Relationships: []
       }
+      skill_endorsements: {
+        Row: {
+          id: string
+          skill: string
+          endorsed_user_id: string
+          endorser_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          skill: string
+          endorsed_user_id: string
+          endorser_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          skill?: string
+          endorsed_user_id?: string
+          endorser_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       study_rooms: {
         Row: {
           id: string
@@ -626,7 +650,14 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      skill_endorsement_counts: {
+        Row: {
+          endorsed_user_id: string
+          skill: string
+          endorsement_count: number
+        }
+        Relationships: []
+      }
     }
     Functions: {
       award_activity_xp: {
