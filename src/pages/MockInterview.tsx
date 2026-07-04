@@ -42,6 +42,7 @@ const MockInterview = () => {
   const [loading, setLoading] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [report, setReport] = useState<Report | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -114,10 +115,13 @@ const MockInterview = () => {
 
     setIsFinished(true);
     setGeneratingReport(true);
+    setReportError(null);
     try {
       const token = await getAccessToken();
       if (!token) {
-        toast.error("Session expired. Please log in again.");
+        const message = "Session expired. Please log in again.";
+        toast.error(message);
+        setReportError(message);
         setGeneratingReport(false);
         return;
       }
@@ -138,6 +142,7 @@ const MockInterview = () => {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to generate evaluation report.";
       toast.error(message);
+      setReportError(message);
     } finally {
       setGeneratingReport(false);
     }
@@ -249,7 +254,16 @@ const MockInterview = () => {
               </div>
             </div>
           ) : (
-            <p className="text-center text-red-400">Failed to load report. Please try again.</p>
+            <div className="flex flex-col items-center gap-4 rounded-2xl border border-red-500/20 bg-red-500/10 p-8 text-center">
+              <p className="text-red-300">{reportError || "Failed to load report. Please try again."}</p>
+              <button
+                onClick={endInterview}
+                disabled={generatingReport}
+                className="bg-slate-800 hover:bg-slate-700 disabled:opacity-50 px-6 py-3 rounded-xl font-medium transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
           )}
         </div>
       </div>
