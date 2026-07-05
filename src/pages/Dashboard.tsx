@@ -24,6 +24,7 @@ interface Profile {
   rating: number | null;
   sessions_completed: number | null;
   points: number | null;
+  streak: number | null;
   badges: string[] | null;
   learning_style: string | null;
   availability: string | null;
@@ -366,7 +367,7 @@ const Dashboard = () => {
 
               <div className="mt-6 flex flex-wrap gap-4">
                 <div className="rounded-2xl border border-orange-400/20 bg-orange-400/8 px-5 py-3 backdrop-blur-xl text-orange-300 text-sm font-medium">
-                  🔥 {profile?.sessions_completed || 0} Day Streak
+                  🔥 {profile?.streak || 0} Day Streak
                 </div>
                 <div className="rounded-2xl border border-indigo-400/20 bg-indigo-400/8 px-5 py-3 backdrop-blur-xl text-indigo-300 text-sm font-medium">
                   ⚡ {profile?.points || 0} XP
@@ -401,15 +402,15 @@ const Dashboard = () => {
           <div className="md:col-span-2 xl:col-span-3 space-y-6">
             {[
               {
-                label: "Sessions Joined",
-                value: upcomingSessions.length || 0,
+                label: "Sessions Completed",
+                value: profile?.sessions_completed || 0,
                 icon: "📚",
                 gradient: "from-cyan-400 to-indigo-500",
                 glow: "rgba(34,211,238,0.2)",
               },
               {
                 label: "Study Hours",
-                value: `${(profile?.sessions_completed || 0) * 2}h`,
+                value: `${Math.round((profile?.focus_time_this_week || 0) / 60)}h`,
                 icon: "⏰",
                 gradient: "from-indigo-400 to-purple-500",
                 glow: "rgba(99,102,241,0.2)",
