@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import RecommendationPanel from "@/components/recommendations/RecommendationPanel";
@@ -74,6 +74,47 @@ const Dashboard = () => {
     user?.email?.split("@")[0] ||
     "Learner";
 
+  // Recommended Peers
+  const fetchRecommendedPeers = useCallback(async (myProfile: Profile) => {
+    if (!user?.id) return;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`${API_BASE_URL}/api/match/supabase-discover?limit=3`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        },
+        credentials:"include"
+      });
+      
+      const data = await res.json();
+      
+      if (data.success && data.recommendations) {
+        const mapped = data.recommendations.map((p: any) => ({
+          id: p.id,
+          name: p.name || "User",
+          avatar: p.avatar_url || `https://api.dicebear.com/9.x/avataaars/svg?seed=${p.name}`,
+          bio: p.bio || "",
+          skills: p.skills ?? [],
+          interests: p.interests ?? [],
+          teachSubjects: p.teach_subjects ?? [],
+          learnSubjects: p.learn_subjects ?? [],
+          rating: p.rating ?? 0,
+          sessionsCompleted: p.sessions_completed ?? 0,
+          points: p.points ?? 0,
+          badges: p.badges ?? [],
+          matchScore: p.score ?? 0,
+        }));
+        
+        setRecommendedPeers(mapped);
+      }
+    } catch (err) {
+      console.error("Failed to fetch recommended peers:", err);
+    }
+  }, [user]);
+
   // Fetch Profile
   useEffect(() => {
     if (!user) return;
@@ -99,7 +140,7 @@ const Dashboard = () => {
 
 
     fetchProfile();
-  }, [user]);
+  }, [user, fetchRecommendedPeers]);
 
   // Activity Feed — derive from sessions joined, resources uploaded, and study rooms joined
   useEffect(() => {
@@ -158,47 +199,6 @@ const Dashboard = () => {
 
     fetchActivity();
   }, [user]);
-
-  // Recommended Peers
-  const fetchRecommendedPeers = async (myProfile: Profile) => {
-    if (!user?.id) return;
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const res = await fetch(`${API_BASE_URL}/api/match/supabase-discover?limit=3`, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`
-        },
-        credentials:"include"
-      });
-      
-      const data = await res.json();
-      
-      if (data.success && data.recommendations) {
-        const mapped = data.recommendations.map((p: any) => ({
-          id: p.id,
-          name: p.name || "User",
-          avatar: p.avatar_url || `https://api.dicebear.com/9.x/avataaars/svg?seed=${p.name}`,
-          bio: p.bio || "",
-          skills: p.skills ?? [],
-          interests: p.interests ?? [],
-          teachSubjects: p.teach_subjects ?? [],
-          learnSubjects: p.learn_subjects ?? [],
-          rating: p.rating ?? 0,
-          sessionsCompleted: p.sessions_completed ?? 0,
-          points: p.points ?? 0,
-          badges: p.badges ?? [],
-          matchScore: p.score ?? 0,
-        }));
-        
-        setRecommendedPeers(mapped);
-      }
-    } catch (err) {
-      console.error("Failed to fetch recommended peers:", err);
-    }
-  };
 
   const handleConnect = async (peerId: string) => {
     if (!user || connectedPeerIds.has(peerId)) return;
