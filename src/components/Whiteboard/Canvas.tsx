@@ -1,12 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/useAuth";
 import { toast } from "sonner";
 import {
+  Point,
   ToolType,
   WhiteboardEvent,
 } from "./types";
+import { nextSegment } from "./strokePath";
 
 type Props = {
   roomId: string;
@@ -15,15 +17,25 @@ type Props = {
 export default function Canvas({ roomId }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+
   const channelRef = useRef<any>(null);
+
   const isDrawing = useRef(false);
+
   const strokesRef = useRef<WhiteboardEvent[]>([]);
+
   const currentStrokeId = useRef<string | null>(null);
+
+  const lastPointRef = useRef<Map<string, Point>>(new Map());
 
   const { user } = useAuth();
 
+  const [hostId, setHostId] = useState<string | null>(null);
+
   const [tool, setTool] = useState<ToolType>("pen");
+
   const [color, setColor] = useState("#ffffff");
+
   const [lineWidth] = useState(3);
 
   const resizeCanvas = () => {
@@ -45,7 +57,9 @@ export default function Canvas({ roomId }: Props) {
     ctx.lineJoin = "round";
 
     const img = new Image();
+
     img.src = previous;
+
     img.onload = () => {
       ctx.drawImage(img, 0, 0);
     };
@@ -53,7 +67,9 @@ export default function Canvas({ roomId }: Props) {
 
   const getContext = () => {
     const canvas = canvasRef.current;
+
     if (!canvas) return null;
+
     return canvas.getContext("2d");
   };
 
@@ -63,45 +79,40 @@ export default function Canvas({ roomId }: Props) {
   ) => {
     if (event.type === "clear") {
       ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      lastPointRef.current.clear();
       return;
     }
 
-    const point = event.payload.point;
-    if (!point) return;
+    // Draw isolated per-stroke segments so interleaved events never cross strokes.
+    const segment = nextSegment(event, lastPointRef.current);
 
-    const drawColor =
+    if (!segment) return;
+
+    ctx.strokeStyle =
       event.payload.tool === "eraser"
         ? "#020617"
         : event.payload.color || "#ffffff";
 
-    ctx.strokeStyle = drawColor;
     ctx.lineWidth = event.payload.lineWidth || 3;
 
-    if (event.type === "draw-start") {
-      ctx.beginPath();
-      ctx.moveTo(point.x, point.y);
-    }
-
-    if (event.type === "draw-move") {
-      ctx.lineTo(point.x, point.y);
-      ctx.stroke();
-    }
-
-    if (event.type === "draw-end") {
-      ctx.closePath();
-    }
+    ctx.beginPath();
+    ctx.moveTo(segment.from.x, segment.from.y);
+    ctx.lineTo(segment.to.x, segment.to.y);
+    ctx.stroke();
   };
 
-  const replayCanvas = () => {
+  const replayCanvas = useCallback(() => {
     const ctx = getContext();
+
     if (!ctx) return;
 
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    lastPointRef.current.clear();
 
     for (const event of strokesRef.current) {
       drawEvent(ctx, event);
     }
-  };
+  }, []);
 
   const persistEvent = async (event: WhiteboardEvent) => {
     const { error } = await supabase.from("whiteboard_events" as any).insert({
@@ -110,7 +121,6 @@ export default function Canvas({ roomId }: Props) {
       type: event.type,
       payload: event.payload,
     });
-
     if (error) {
       console.error("Whiteboard save failed:", error);
       toast.error("Drawing could not be saved. Please check your connection.");
@@ -129,19 +139,29 @@ export default function Canvas({ roomId }: Props) {
   };
 
   const pushEvent = (event: WhiteboardEvent) => {
-    strokesRef.current.push(event);
+    const ownedEvent: WhiteboardEvent = {
+      ...event,
+      user_id: user?.id,
+    };
+
+    strokesRef.current.push(ownedEvent);
 
     const ctx = getContext();
+
     if (!ctx) return;
 
-    drawEvent(ctx, event);
-    broadcastEvent(event);
-    persistEvent(event);
+    drawEvent(ctx, ownedEvent);
+
+    broadcastEvent(ownedEvent);
+
+    persistEvent(ownedEvent);
   };
 
   useEffect(() => {
     resizeCanvas();
+
     window.addEventListener("resize", resizeCanvas);
+
     return () => {
       window.removeEventListener("resize", resizeCanvas);
     };
@@ -149,6 +169,16 @@ export default function Canvas({ roomId }: Props) {
 
   useEffect(() => {
     const initializeBoard = async () => {
+      const { data: room } = await supabase
+        .from("study_rooms" as any)
+        .select("created_by")
+        .eq("id", roomId)
+        .single();
+
+      if (room) {
+        setHostId((room as any).created_by);
+      }
+
       const { data, error } = await supabase
         .from("whiteboard_events" as any)
         .select("*")
@@ -169,7 +199,9 @@ export default function Canvas({ roomId }: Props) {
 
     initializeBoard();
 
-    const channel = supabase.channel(`whiteboard_${roomId}`);
+    const channel = supabase.channel(
+      `whiteboard_${roomId}`
+    );
 
     channel
       .on(
@@ -179,9 +211,23 @@ export default function Canvas({ roomId }: Props) {
           if (payload.senderId === user?.id) return;
 
           const event: WhiteboardEvent = payload;
+
+          if (event.type === "undo") {
+            strokesRef.current = strokesRef.current.filter(
+              (stroke) =>
+                stroke.payload?.strokeId !==
+                event.payload?.strokeId
+            );
+
+            replayCanvas();
+
+            return;
+          }
+
           strokesRef.current.push(event);
 
           const ctx = getContext();
+
           if (!ctx) return;
 
           drawEvent(ctx, event);
@@ -194,40 +240,55 @@ export default function Canvas({ roomId }: Props) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [roomId]);
+  }, [roomId, replayCanvas, user?.id]);
 
   const getCoordinates = (
     e: React.MouseEvent<HTMLCanvasElement>
   ) => {
     const canvas = canvasRef.current;
+
     if (!canvas) return null;
 
     const rect = canvas.getBoundingClientRect();
+
     return {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
     };
   };
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const startDrawing = (
+    e: React.MouseEvent<HTMLCanvasElement>
+  ) => {
     isDrawing.current = true;
 
     const point = getCoordinates(e);
+
     if (!point) return;
 
     const strokeId = crypto.randomUUID();
+
     currentStrokeId.current = strokeId;
 
     pushEvent({
       type: "draw-start",
-      payload: { point, color, lineWidth, tool, strokeId },
+      payload: {
+        point,
+        color,
+        lineWidth,
+        tool,
+        strokeId,
+      },
     });
   };
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const draw = (
+    e: React.MouseEvent<HTMLCanvasElement>
+  ) => {
     if (!isDrawing.current) return;
 
     const point = getCoordinates(e);
+
     if (!point) return;
 
     pushEvent({
@@ -237,7 +298,8 @@ export default function Canvas({ roomId }: Props) {
         color,
         lineWidth,
         tool,
-        strokeId: currentStrokeId.current || undefined,
+        strokeId:
+          currentStrokeId.current || undefined,
       },
     });
   };
@@ -253,19 +315,24 @@ export default function Canvas({ roomId }: Props) {
         color,
         lineWidth,
         tool,
-        strokeId: currentStrokeId.current || undefined,
+        strokeId:
+          currentStrokeId.current || undefined,
       },
     });
 
     currentStrokeId.current = null;
   };
-
   const undoLastStroke = async () => {
     const events = [...strokesRef.current];
+
     let lastStrokeId: string | undefined;
 
     for (let i = events.length - 1; i >= 0; i--) {
-      const strokeId = events[i].payload?.strokeId;
+      if (events[i].user_id !== user?.id) continue;
+
+      const strokeId =
+        events[i].payload?.strokeId;
+
       if (strokeId) {
         lastStrokeId = strokeId;
         break;
@@ -275,48 +342,67 @@ export default function Canvas({ roomId }: Props) {
     if (!lastStrokeId) return;
 
     const updated = events.filter(
-      (event) => event.payload?.strokeId !== lastStrokeId
+      (event) =>
+        event.payload?.strokeId !==
+        lastStrokeId
     );
 
     strokesRef.current = updated;
+
     replayCanvas();
 
-    const { error } = await supabase
+    const { error: undoError } = await supabase
       .from("whiteboard_events" as any)
       .delete()
       .eq("room_id", roomId)
+      .eq("user_id", user?.id)
       .eq("payload->>strokeId", lastStrokeId);
 
-    if (error) {
-      console.error("Undo failed to sync:", error);
+    if (undoError) {
+      console.error("Undo failed to sync:", undoError);
       toast.error("Undo could not be saved. Please check your connection.");
     }
 
-    broadcastEvent({ type: "clear", payload: {} });
-
-    for (const event of updated) {
-      broadcastEvent(event);
-    }
+    broadcastEvent({
+      type: "undo",
+      payload: {
+        strokeId: lastStrokeId,
+      },
+    });
   };
 
   const clearBoard = async () => {
+    if (user?.id !== hostId) return;
+
     const ctx = getContext();
+
     if (!ctx) return;
 
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.clearRect(
+      0,
+      0,
+      ctx.canvas.width,
+      ctx.canvas.height
+    );
+
+    lastPointRef.current.clear();
+
     strokesRef.current = [];
 
-    const { error } = await supabase
+    const { error: clearError } = await supabase
       .from("whiteboard_events" as any)
       .delete()
       .eq("room_id", roomId);
 
-    if (error) {
-      console.error("Clear board failed to sync:", error);
+    if (clearError) {
+      console.error("Clear board failed to sync:", clearError);
       toast.error("Board could not be cleared on the server. Please try again.");
     }
 
-    broadcastEvent({ type: "clear", payload: {} });
+    broadcastEvent({
+      type: "clear",
+      payload: {},
+    });
   };
 
   return (
@@ -327,22 +413,20 @@ export default function Canvas({ roomId }: Props) {
       <div className="flex items-center gap-3 p-3 border-b border-slate-800 bg-slate-900">
         <button
           onClick={() => setTool("pen")}
-          className={`px-3 py-1 rounded text-sm ${
-            tool === "pen"
-              ? "bg-blue-600 text-white"
-              : "bg-slate-800 text-slate-300"
-          }`}
+          className={`px-3 py-1 rounded text-sm ${tool === "pen"
+            ? "bg-blue-600 text-white"
+            : "bg-slate-800 text-slate-300"
+            }`}
         >
           Pen
         </button>
 
         <button
           onClick={() => setTool("eraser")}
-          className={`px-3 py-1 rounded text-sm ${
-            tool === "eraser"
-              ? "bg-blue-600 text-white"
-              : "bg-slate-800 text-slate-300"
-          }`}
+          className={`px-3 py-1 rounded text-sm ${tool === "eraser"
+            ? "bg-blue-600 text-white"
+            : "bg-slate-800 text-slate-300"
+            }`}
         >
           Eraser
         </button>
@@ -350,10 +434,11 @@ export default function Canvas({ roomId }: Props) {
         <input
           type="color"
           value={color}
-          onChange={(e) => setColor(e.target.value)}
+          onChange={(e) =>
+            setColor(e.target.value)
+          }
           className="w-10 h-10 bg-transparent border-none"
         />
-
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={undoLastStroke}
@@ -362,12 +447,14 @@ export default function Canvas({ roomId }: Props) {
             Undo
           </button>
 
-          <button
-            onClick={clearBoard}
-            className="px-3 py-1 rounded text-sm bg-red-600 text-white hover:bg-red-700"
-          >
-            Clear
-          </button>
+          {user?.id === hostId && (
+            <button
+              onClick={clearBoard}
+              className="px-3 py-1 rounded text-sm bg-red-600 text-white hover:bg-red-700"
+            >
+              Clear
+            </button>
+          )}
         </div>
       </div>
 
@@ -378,22 +465,29 @@ export default function Canvas({ roomId }: Props) {
         onMouseMove={draw}
         onMouseUp={stopDrawing}
         onMouseLeave={stopDrawing}
+
         onTouchStart={(e) => {
           e.preventDefault();
+
           const touch = e.touches[0];
+
           startDrawing({
             clientX: touch.clientX,
             clientY: touch.clientY,
           } as any);
         }}
+
         onTouchMove={(e) => {
           e.preventDefault();
+
           const touch = e.touches[0];
+
           draw({
             clientX: touch.clientX,
             clientY: touch.clientY,
           } as any);
         }}
+
         onTouchEnd={stopDrawing}
       />
     </div>
